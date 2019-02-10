@@ -36,7 +36,7 @@ class DataTruthAnalyzer(object):
     #print('Interpolated truth data:', self.truthManager.idMapData)
     self.allTimeData = OrderedDict()
     for time in uTimes:
-      print '****  Time = ', time, ' *****'
+      print('****  Time = ', time, ' *****')
       validTrkIds = []
       validTruthIds = []
       thisTimeTrkData = []
@@ -75,9 +75,9 @@ class DataTruthAnalyzer(object):
           assignedTrk = validTrkIds[trkIdx]
           truthTrackAssignment[iTruth] = assignedTrk
           trackTruthAssignment[trkIdx] = truthId
-          print 'Truth', truthId, 'assigned to', assignedTrk
+          print('Truth', truthId, 'assigned to', assignedTrk)
         else:
-          print 'Truth', truthId, 'not assigned'
+          print('Truth', truthId, 'not assigned')
         self.truthAssignments[truthId]['TRK_IDS'].append(assignedTrk)
         self.truthAssignments[truthId]['TIME'].append(time)
       for iTrk, trkId in enumerate(validTrkIds):

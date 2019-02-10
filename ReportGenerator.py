@@ -64,7 +64,7 @@ class ReportGenerator(object):
     self.write('\\section{Single Integrated Air Picture (SIAP) Metrics}')
     
     # Grab values out of the allTimeData that we need for the different calculation.
-    times = allTimeData.keys()
+    times = numpy.array([k for k in allTimeData.keys()])
     numAssigned = numpy.array([d['numAssignedTrks'] for d in allTimeData.values()], float)
     numAssoc = numpy.array([d['numAssociatedTrks'] for d in allTimeData.values()], float)
     numTruth = numpy.array([len(d['validTruthIds']) for d in allTimeData.values()], float)
@@ -82,6 +82,7 @@ class ReportGenerator(object):
     completeness = sum(numAssigned) / sum(numTruth)
     self.write('The overall completess is:', '{0:.3f}\\%.'.format(100.0*completeness))
     fig, ax = self._getSingleAxisFigure(xlabel='Time', ylabel='Completeness', title='Completeness Over Time')
+    print('times:', times, 'shape:', numpy.shape(times))
     ax.plot(times, 100.0 * numAssigned / numTruth, 'bo')
     ax.plot(times, 100.0 * numpy.ones(numpy.shape(times)), 'g:')
     ax.plot(times, numpy.zeros(numpy.shape(times)), 'r:')
@@ -136,9 +137,9 @@ class ReportGenerator(object):
     for truthId, truthData in truthManager.idMapData.items():
       ax.plot(truthData['X'], truthData['Y'], '-', label=str(truthId))
       log = numpy.logical_not(numpy.logical_or(numpy.isnan(truthData['X']), numpy.isnan(truthData['Y'])))
-      print log
+      print(log)
       idx = numpy.squeeze(numpy.where(log))
-      print 'idx:', idx
+      print('idx:', idx)
       ax.plot(truthData['X'][idx[0]], truthData['Y'][idx[0]], 'go', label=None)
       ax.plot(truthData['X'][idx[-1]], truthData['Y'][idx[-1]], 'ro', label=None)
     ax.legend()
@@ -164,7 +165,7 @@ class ReportGenerator(object):
     allTrackIds = self.dta.trackManager.idMapData.keys()
     for iTrk, trkId in enumerate(allTrackIds):
       self.write('\\subsection{Track', trkId, 'Assignments}')
-      #print 'Looking at track', trkId
+      #print('Looking at track', trkId)
       truthAssignments = self.dta.trackAssignments[trkId]
       truthAssignmentIds = numpy.array(truthAssignments['TRUTH_IDS'])
       self.write('Track', trkId, 'assigned to truths:', truthAssignmentIds, '\\\\')
@@ -178,9 +179,9 @@ class ReportGenerator(object):
         fig, ax = self._getSingleAxisFigure(xlabel='Time', ylabel='Assigned Truth', title='Track ' + str(trkId) + ' Assignments')
         for iUTruth, truthId in enumerate(uTruth):
           idx = numpy.squeeze(numpy.where(truthAssignmentIds == truthId))
-          #print 'trackAssignments:', trackAssignments
-          #print 'idx:', idx, ' for truthId:', truthId
-          #print validTimes
+          #print('trackAssignments:', trackAssignments)
+          #print('idx:', idx, ' for truthId:', truthId)
+          #print(validTimes)
           ax.plot(numpy.array(truthAssignments['TIME'])[idx], iUTruth * numpy.ones(numpy.shape(idx)), 's')
         ax.set(ylim=(-0.1, len(uTruth) - 0.9))
         ax.set(yticks=range(0, len(uTruth)), yticklabels=[str(truth) if truth >= 0 else 'Unassigned' for truth in uTruth])
@@ -188,7 +189,7 @@ class ReportGenerator(object):
         self._makeAssignedTrackAndTruthPlots(trkId, bestAssignedTruth)
       else:
         self.write('Track', trkId, 'never assigned to truth.', os.linesep)
-      #print 'Done with track', trkId
+      #print('Done with track', trkId)
 
   def _makeAssignedTrackAndTruthPlots(self, trkId, truthId):
     # Straight comparisons
@@ -236,7 +237,7 @@ class ReportGenerator(object):
     allTruthIds = self.dta.truthManager.idMapData.keys()
     for iTruth, truthId in enumerate(allTruthIds):
       self.write('\\subsection{Truth', truthId, 'Assignments}')
-      #print 'Looking at truth', truthId
+      #print('Looking at truth', truthId)
       trkAssignments = self.dta.truthAssignments[truthId]
       trkAssignmentIds = numpy.array(trkAssignments['TRK_IDS'])
       idx = numpy.where(trkAssignmentIds >= 0)
@@ -249,21 +250,21 @@ class ReportGenerator(object):
       fig, ax = self._getSingleAxisFigure(xlabel='Time', ylabel='Assigned Track', title='Truth ' + str(truthId) + ' Assignments')
       for iUTrk, trkId in enumerate(uTrk):
         idx = numpy.squeeze(numpy.where(trkAssignmentIds == trkId))
-        #print 'trackAssignments:', trackAssignments
-        #print 'idx:', idx, ' for trkId:', trkId
-        #print validTimes
+        #print('trackAssignments:', trackAssignments)
+        #print('idx:', idx, ' for trkId:', trkId)
+        #print(validTimes)
         ax.plot(numpy.array(trkAssignments['TIME'])[idx], iUTrk * numpy.ones(numpy.shape(idx)), 's')
       ax.set(ylim=(-0.1, len(uTrk) - 0.9))
       ax.set(yticks=range(0, len(uTrk)), yticklabels=[str(trk) if trk >= 0 else 'Unassigned' for trk in uTrk])
       self._addFigures([fig], [''.join(('truth', str(truthId), 'Assignments.pdf'))], 1)
-      #print 'Done with truth', truthId
+      #print('Done with truth', truthId)
 
   def _addFigures(self, figs, names, numPerRow=1):
     self.write('\\begin{center}')
     self.write('\\begin{minipage}{\\textwidth}')
     width = str(7.0 / numPerRow - 0.2) + 'in'
     for fig, name in zip(figs, names):
-      #print 'Saving figure', name
+      #print('Saving figure', name)
       fig.savefig(name)
       plt.close(fig)
       self.write('  \\includegraphics[width='+width+']{'+name+'}')
