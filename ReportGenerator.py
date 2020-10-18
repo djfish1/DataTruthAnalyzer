@@ -1,3 +1,4 @@
+import collections
 import matplotlib as mat
 import matplotlib.pyplot as plt
 import numpy
@@ -5,10 +6,29 @@ import os
 
 class ReportGenerator(object):
 
-  def __init__(self, dataTruthAnalyzer, baseName):
+  def __init__(self, dataTruthAnalyzer, baseName, plotFile):
     self.dta = dataTruthAnalyzer
     self.baseName = baseName
+    self.outDir = self.baseName + 'Plots'
+    os.makedirs(self.outDir, exist_ok=True)
     self._setupPlotDefaults()
+    self.plotFile = plotFile
+    self._setupPlots()
+
+  def _setupPlots(self):
+    self.plotDict = collections.OrderedDict()
+    with open(self.plotFile, 'r') as pf:
+      for line in pf.readlines():
+        print('Line:', line)
+        splitLine = line.strip().split(':')
+        cat = splitLine[0]
+        x = splitLine[1]
+        y = splitLine[2]
+        plotList = self.plotDict.get(cat, [])
+        plotList.append((x, y))
+        self.plotDict[cat] = plotList
+
+    print(self.plotDict)
 
   def _setupPlotDefaults(self):
     p = mat.rcParams
@@ -20,9 +40,9 @@ class ReportGenerator(object):
     p.update({'axes.titleweight': 'bold'})
     p.update({'axes.xmargin': 0.01})
     p.update({'axes.ymargin': 0.01})
-    p.update({'lines.linewidth': 1.5})
+    p.update({'lines.linewidth': 2.5})
     p.update({'lines.markersize': 8.0})
-    p.update({'markers.fillstyle': 'none'})
+    p.update({'markers.fillstyle': 'full'})
     p.update({'legend.markerscale': 2.0})
     p.update({'legend.numpoints': 1})
     self.defaultLineCycler = plt.cycler('color', ('#0000dd', '#dd0000', '#00dd00', '#ddaa00', '#000000', '#00dddd'))
@@ -135,27 +155,29 @@ class ReportGenerator(object):
     self.write('\\subsection{Overall Truth Geometry}')
     fig, ax = self._getSingleAxisFigure(xlabel='X', ylabel='Y', title='Overall Geometry', prop_cycle=self.defaultLineCycler)
     for truthId, truthData in truthManager.idMapData.items():
-      ax.plot(truthData['X'], truthData['Y'], '-', label=str(truthId))
-      log = numpy.logical_not(numpy.logical_or(numpy.isnan(truthData['X']), numpy.isnan(truthData['Y'])))
+      xAxis, yAxis = ('X', 'Y')
+      ax.plot(truthData[xAxis], truthData[yAxis], '-', label=str(truthId))
+      log = numpy.logical_not(numpy.logical_or(numpy.isnan(truthData[xAxis]), numpy.isnan(truthData[yAxis])))
       print(log)
       idx = numpy.squeeze(numpy.where(log))
-      print('idx:', idx)
-      ax.plot(truthData['X'][idx[0]], truthData['Y'][idx[0]], 'go', label=None)
-      ax.plot(truthData['X'][idx[-1]], truthData['Y'][idx[-1]], 'ro', label=None)
+      #print('idx:', idx)
+      ax.plot(truthData[xAxis][idx[0]], truthData[yAxis][idx[0]], 'go', label=None)
+      ax.plot(truthData[xAxis][idx[-1]], truthData[yAxis][idx[-1]], 'ro', label=None)
     ax.legend()
     self._addFigures([fig], ['truthOverallGeometry.pdf'], 1)
     for truthId, truthData in truthManager.idMapData.items():
       self.write('\\subsection{Summary for truth: ' + str(truthId) + '}')
-      plotDims = (('X', 'Y'), (truthManager._timeField, 'X'), (truthManager._timeField, 'Y'))
       figs = []
       names = []
-      for plotDim in plotDims:
-        fig, ax = self._getSingleAxisFigure(xlabel=plotDim[0],
-          ylabel=plotDim[1],
-          title='{0:s} vs {1:s} for truth {2:s}'.format(plotDim[0], plotDim[1], str(truthId)))
+      for plotDims in self.plotDict['TRUTH']:
+        xAxis = self.dta.truthManager._timeField if plotDims[0] == 'T' else plotDims[0]
+        yAxis = self.dta.truthManager._timeField if plotDims[1] == 'T' else plotDims[1]
+        fig, ax = self._getSingleAxisFigure(xlabel=xAxis,
+          ylabel=yAxis,
+          title='{0:s} vs {1:s} for truth {2:s}'.format(xAxis, yAxis, str(truthId)))
         figs.append(fig)
-        names.append('truth{2:d}_{0:s}vs{1:s}.pdf'.format(plotDim[0], plotDim[1], truthId))
-        ax.plot(truthData[plotDim[0]], truthData[plotDim[1]], 'b-')
+        names.append('truth{2:d}_{0:s}vs{1:s}.pdf'.format(xAxis, yAxis, truthId))
+        ax.plot(truthData[xAxis], truthData[yAxis], 'b-')
       self._addFigures(figs, names, 2)
 
   def _makeTrackAssignmentSummary(self):
@@ -193,41 +215,48 @@ class ReportGenerator(object):
 
   def _makeAssignedTrackAndTruthPlots(self, trkId, truthId):
     # Straight comparisons
-    truthPlotDims = (('X', 'Y'), (self.dta.truthManager._timeField, 'X'), (self.dta.truthManager._timeField, 'Y'))
-    trackPlotDims = (('X', 'Y'), (self.dta.trackManager._timeField, 'X'), (self.dta.trackManager._timeField, 'Y'))
+    plotDims = self.plotDict['TRACK']
     figs = []
     names = []
     truthData = self.dta.truthManager.idMapData[truthId]
     trkData = self.dta.trackManager.idMapData[trkId]
-    for truthDim, trkDim in zip(truthPlotDims, trackPlotDims):
-      fig, ax = self._getSingleAxisFigure(xlabel=truthDim[0],
-        ylabel=truthDim[1],
-        axis_bgcolor=(0.5, 0.5, 0.5),
-        title='{0:s} vs {1:s} for truth {2:s} and track {3:s}'.format(truthDim[0], truthDim[1], str(truthId), str(trkId)))
+    for plotDim in plotDims:
+      xAxisTrk = self.dta.trackManager._timeField if plotDim[0] in ('T', 'TIME') else plotDim[0]
+      yAxisTrk = self.dta.trackManager._timeField if plotDim[1] in ('T', 'TIME') else plotDim[1]
+      xAxisTruth = self.dta.truthManager._timeField if plotDim[0] in ('T', 'TIME') else plotDim[0]
+      yAxisTruth = self.dta.truthManager._timeField if plotDim[1] in ('T', 'TIME') else plotDim[1]
+      fig, ax = self._getSingleAxisFigure(xlabel=xAxisTrk,
+        ylabel=yAxisTrk,
+        facecolor=(0.5, 0.5, 0.5),
+        title='{0:s} vs {1:s} for truth {2:s} and track {3:s}'.format(xAxisTrk, yAxisTrk, str(truthId), str(trkId)))
       figs.append(fig)
-      names.append('truth{2:d}WithTrack{3:d}_{0:s}vs{1:s}.pdf'.format(truthDim[0], truthDim[1], truthId, trkId))
-      ax.plot(truthData[truthDim[0]], truthData[truthDim[1]], 'ko-', markeredgecolor='k', markersize=8)
-      ax.plot(trkData[trkDim[0]], trkData[trkDim[1]], 'wo', markeredgecolor='w', markersize=5)
+      names.append('truth{2:d}WithTrack{3:d}_{0:s}vs{1:s}.pdf'.format(xAxisTrk, yAxisTrk, truthId, trkId))
+      ax.plot(truthData[xAxisTruth], truthData[yAxisTruth], 'ko-', markeredgecolor='k', markersize=8)
+      ax.plot(trkData[xAxisTrk], trkData[yAxisTrk], 'wo', markeredgecolor='w', markersize=5)
     self._addFigures(figs, names, 2)
 
-    # Deltas with uncertinty
-    truthPlotDims = ((self.dta.truthManager._timeField, 'X'), (self.dta.truthManager._timeField, 'Y'))
-    trackPlotDims = ((self.dta.trackManager._timeField, 'X'), (self.dta.trackManager._timeField, 'Y'))
+    # Deltas with uncertainty
+    plotDims = self.plotDict['ERROR']
     figs = []
     names = []
     truthData = self.dta.truthManager.idMapData[truthId]
     trkData = self.dta.trackManager.idMapData[trkId]
-    for truthDim, trkDim in zip(truthPlotDims, trackPlotDims):
-      fig, ax = self._getSingleAxisFigure(xlabel=truthDim[0],
-        ylabel=truthDim[1],
-        axis_bgcolor=(0.5, 0.5, 0.5),
-        title='{0:s} vs {1:s} Errors for truth {2:s} and track {3:s}'.format(truthDim[0], truthDim[1], str(truthId), str(trkId)))
+    for plotDim in plotDims:
+      xAxisTrk = self.dta.trackManager._timeField if plotDim[0] in ('T', 'TIME') else plotDim[0]
+      yAxisTrk = self.dta.trackManager._timeField if plotDim[1] in ('T', 'TIME') else plotDim[1]
+      xAxisTruth = self.dta.truthManager._timeField if plotDim[0] in ('T', 'TIME') else plotDim[0]
+      yAxisTruth = self.dta.truthManager._timeField if plotDim[1] in ('T', 'TIME') else plotDim[1]
+      fig, ax = self._getSingleAxisFigure(xlabel=xAxisTrk,
+        ylabel=yAxisTrk,
+        facecolor=(0.5, 0.5, 0.5),
+        title='{0:s} vs {1:s} Errors for truth {2:s} and track {3:s}'.format(xAxisTrk, yAxisTrk, str(truthId), str(trkId)))
       figs.append(fig)
-      names.append('truth{2:d}WithTrack{3:d}Errors_{0:s}vs{1:s}.pdf'.format(truthDim[0], truthDim[1], truthId, trkId))
-      ax.plot(truthData[truthDim[0]], numpy.zeros(numpy.shape(truthData[truthDim[0]])), 'ko-', markeredgecolor='k', markersize=8)
-      interpTruth = numpy.interp(trkData[trkDim[0]], truthData[truthDim[0]], truthData[truthDim[1]], left=numpy.nan, right=numpy.nan) 
-      ax.errorbar(trkData[trkDim[0]], trkData[trkDim[1]] - interpTruth,
-          yerr=2.0*trkData['SIGMA_'+trkDim[1]], ecolor='w', markeredgecolor='w', linestyle='None', marker='o', markersize=5)
+      names.append('truth{2:d}WithTrack{3:d}Errors_{0:s}vs{1:s}.pdf'.format(xAxisTrk, yAxisTrk, truthId, trkId))
+      if xAxisTrk == self.dta.trackManager._timeField:
+        ax.plot(truthData[xAxisTruth], numpy.zeros(numpy.shape(truthData[xAxisTruth])), 'k-', markeredgecolor='k', markersize=8)
+        interpTruth = numpy.interp(trkData[xAxisTrk], truthData[xAxisTruth], truthData[yAxisTruth], left=numpy.nan, right=numpy.nan) 
+        ax.errorbar(trkData[xAxisTrk], trkData[yAxisTrk] - interpTruth,
+            yerr=2.0*trkData['SIGMA_'+yAxisTrk], ecolor='w', markeredgecolor='w', linestyle='None', marker='o', markersize=5)
     self._addFigures(figs, names, 2)
 
   def _makeTruthAssignmentSummary(self):
@@ -264,10 +293,11 @@ class ReportGenerator(object):
     self.write('\\begin{minipage}{\\textwidth}')
     width = str(7.0 / numPerRow - 0.2) + 'in'
     for fig, name in zip(figs, names):
+      fullName = os.path.join(self.outDir, name)
       #print('Saving figure', name)
-      fig.savefig(name)
+      fig.savefig(fullName)
       plt.close(fig)
-      self.write('  \\includegraphics[width='+width+']{'+name+'}')
+      self.write('  \\includegraphics[width='+width+']{'+fullName+'}')
     self.write('\\end{minipage}')
     self.write('\\end{center}')
 

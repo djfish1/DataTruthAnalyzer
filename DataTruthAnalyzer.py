@@ -1,12 +1,12 @@
-import DataManager as dm
-import ReportGenerator
-
+import argparse
 from collections import OrderedDict
 import math
 import numpy
-import optparse
 import os
 from scipy.optimize import linear_sum_assignment
+
+import DataManager as dm
+import ReportGenerator
 
 class DataTruthAnalyzer(object):
   def __init__(self, trackFile, truthFile):
@@ -120,13 +120,14 @@ class DataTruthAnalyzer(object):
     return score if score < self.ASSOC_GATE else self.IMPOSSIBLE_SCORE
 
 if __name__ == '__main__':
-  op = optparse.OptionParser()
-  op.add_option('--track', type='string', dest='trackFile', help='Track file name')
-  op.add_option('--truth', type='string', dest='truthFile', help='Truth file name')
-  opts, args = op.parse_args()
+  ap = argparse.ArgumentParser()
+  ap.add_argument('--track', type=str, dest='trackFile', help='Track file name')
+  ap.add_argument('--truth', type=str, dest='truthFile', help='Truth file name')
+  ap.add_argument('--plots', type=str, dest='plotFile', help='Plot configuration file name')
+  opts = ap.parse_args()
   dta = DataTruthAnalyzer(opts.trackFile, opts.truthFile)
   #print('Track data:', dta.trackManager.idMapData)
   #print('Truth data:', dta.truthManager.idMapData)
   dta.assignTracksToTruth()
-  rg = ReportGenerator.ReportGenerator(dta, 'testReport')
+  rg = ReportGenerator.ReportGenerator(dta, 'testReport', opts.plotFile)
   rg.generateReport()
